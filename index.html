@@ -1175,39 +1175,74 @@ else { document.addEventListener('DOMContentLoaded', _doInit); }
    AUTH
 ════════════════════════ */
 function doLogin() {
-  var u = document.getElementById('liU').value.trim();
-  var p = document.getElementById('liP').value.trim();
+  var u = (document.getElementById('liU') && document.getElementById('liU').value || '').trim();
+  var p = (document.getElementById('liP') && document.getElementById('liP').value || '').trim();
   var err = document.getElementById('liErr');
-  var btn = document.getElementById('liBtn');
-  if(!u || !p) { err.textContent='يرجى إدخال اسم المستخدم وكلمة المرور'; return; }
-  err.textContent = '';
-  btn.disabled = true; btn.textContent = '⏳ جارٍ التحقق…';
+  if(err) err.textContent = '';
 
-  if(DEV) {
-    setTimeout(function() {
-      sess = { username:u, displayName:u, role:'admin', loginTime:Date.now(), isAll:true, stations:[] };
-      localStorage.setItem('c3aSess', JSON.stringify(sess));
-      afterLogin(); loadData();
-    }, 600);
+  if(!u || !p) {
+    if(err) err.textContent = 'أدخل اسم المستخدم وكلمة المرور';
     return;
   }
 
-  db.login(u, p)
-    .then(function(r) {
-      btn.disabled = false; btn.textContent = 'دخول ← تسجيل';
-      if(r.success) {
-        sess = Object.assign({}, r, {loginTime: r.loginTime || Date.now()});
-        localStorage.setItem('c3aSess', JSON.stringify(sess));
-        if(!DEV) db.log(sess.username||'?', 'LOGIN', 'role='+sess.role);
-        afterLogin(); loadData();
-      } else { err.textContent = r.error || 'خطأ في تسجيل الدخول'; }
+  // وضع التطوير التجريبي
+  if(DEV) {
+    if(u.toLowerCase() === 'admin' && p === 'admin123') {
+      sess = { username:'admin', display_name:'المدير العام', role:'admin', stations:[], loginTime:Date.now(), _isAll:true };
+      localStorage.setItem('c3aSess', JSON.stringify(sess));
+      afterLogin();
+      loadData();
+    } else {
+      if(err) err.textContent = 'المستخدم غير موجود (وضع التطوير)';
+    }
+    return;
+  }
+
+  // الاتصال الحقيقي بقاعدة البيانات باستخدام الباسورد بدون تشفير
+  var sbc = _initSB();
+  var finalUser = u.toUpperCase(); // يتوافق مع معالجة النظام للحروف الكبيرة
+
+  sbc.from('app_users')
+    .select('*')
+    .eq('username', finalUser)
+    .then(function(res) {
+      if(res.error) {
+        if(err) err.textContent = 'خطأ في الاتصال: ' + res.error.message;
+        return;
+      }
+      var user = res.data && res.data[0];
+      
+      // مقارنة مباشرة بالنص الصريح المكتوب
+      if(!user || user.password !== p) {
+        if(err) err.textContent = 'المستخدم غير موجود أو كلمة المرور خاطئة';
+        return;
+      }
+
+      // بناء الجلسة بنجاح
+      var allowed = [];
+      try {
+        allowed = typeof user.stations === 'string' ? JSON.parse(user.stations || '[]') : (user.stations || []);
+      } catch(e){}
+      
+      sess = {
+        username: user.username,
+        display_name: user.display_name || user.username,
+        role: user.role || 'operator',
+        stations: allowed,
+        loginTime: Date.now(),
+        _isAll: !allowed || allowed.length === 0,
+        _allowed: allowed
+      };
+      
+      localStorage.setItem('c3aSess', JSON.stringify(sess));
+      afterLogin();
+      loadData();
+      db.log(user.username, 'LOGIN', 'تسجيل دخول ناجح');
     })
     .catch(function(e) {
-      btn.disabled = false; btn.textContent = 'دخول ← تسجيل';
-      err.textContent = 'فشل الاتصال: ' + e.message;
+      if(err) err.textContent = 'فشل النظام: ' + e.message;
     });
 }
-
 function afterLogin() {
   document.getElementById('s-login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
