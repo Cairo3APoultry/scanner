@@ -857,9 +857,8 @@ tbody tr:last-child{border-bottom:none;}
 ══════════════════════════════════════════════════ */
 
 /* ════ CONFIG — SUPABASE ════ */
-var SB_URL = 'https://qqnxyoxptfyovrmvdvma.supabase.co';
+  var SB_URL = 'https://qqnxyoxptfyovrmvdvma.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbnh5b3hwdGZ5b3ZybXZkdm1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4NTkzODMsImV4cCI6MjA5NzQzNTM4M30.ylCIKfkce65zP_jjP9i2PmC0RFOW60Y8MRlQqLePVtQ';
-  var sb = null;
 function _initSB() {
   if(sb) return sb;
   try { sb = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) {}
