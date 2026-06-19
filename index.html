@@ -1185,22 +1185,14 @@ function doLogin() {
     return;
   }
 
-  // وضع التطوير التجريبي
-  if(DEV) {
-    if(u.toLowerCase() === 'admin' && p === 'admin123') {
-      sess = { username:'admin', display_name:'المدير العام', role:'admin', stations:[], loginTime:Date.now(), _isAll:true };
-      localStorage.setItem('c3aSess', JSON.stringify(sess));
-      afterLogin();
-      loadData();
-    } else {
-      if(err) err.textContent = 'المستخدم غير موجود (وضع التطوير)';
-    }
-    return;
-  }
-
-  // الاتصال الحقيقي بقاعدة البيانات باستخدام الباسورد بدون تشفير
+  // إجبار الكود على الاتصال الحقيقي بقاعدة البيانات ومسح الفحص التلقائي لـ DEV
   var sbc = _initSB();
-  var finalUser = u.toUpperCase(); // يتوافق مع معالجة النظام للحروف الكبيرة
+  
+  // معالجة اسم المستخدم (حروف صغيرة ومسح المسافات)
+  var finalUser = u.toLowerCase().replace(/\s+/g,'');
+
+  // تحويل الباسورد لـ SHA256 كما ينتظره السيرفر
+  var hashedPass = sha256(p); 
 
   sbc.from('app_users')
     .select('*')
@@ -1210,15 +1202,15 @@ function doLogin() {
         if(err) err.textContent = 'خطأ في الاتصال: ' + res.error.message;
         return;
       }
+      
       var user = res.data && res.data[0];
       
-      // مقارنة مباشرة بالنص الصريح المكتوب
-      if(!user || user.password !== p) {
+      if(!user || user.password !== hashedPass) {
         if(err) err.textContent = 'المستخدم غير موجود أو كلمة المرور خاطئة';
         return;
       }
 
-      // بناء الجلسة بنجاح
+      // بناء جلسة تسجيل الدخول الناجحة
       var allowed = [];
       try {
         allowed = typeof user.stations === 'string' ? JSON.parse(user.stations || '[]') : (user.stations || []);
@@ -1237,13 +1229,11 @@ function doLogin() {
       localStorage.setItem('c3aSess', JSON.stringify(sess));
       afterLogin();
       loadData();
-      db.log(user.username, 'LOGIN', 'تسجيل دخول ناجح');
     })
     .catch(function(e) {
       if(err) err.textContent = 'فشل النظام: ' + e.message;
     });
-}
-function afterLogin() {
+}function afterLogin() {
   document.getElementById('s-login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('navUname').textContent = sess.displayName || sess.username || '—';
