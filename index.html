@@ -865,7 +865,8 @@ function _initSB() {
   try { sb = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) {}
   return sb;
 }
-var DEV = false;
+var DEV = (!SB_URL || SB_URL.indexOf('http') !== 0);
+
 /* ════ DEFAULT STATIONS ════ */
 var ST_DEFAULT = [
   {key:'wash',  label:'مغسلة',      icon:'🚿', bench:15, en:'Wash',    order:1},
@@ -1175,64 +1176,40 @@ else { document.addEventListener('DOMContentLoaded', _doInit); }
    AUTH
 ════════════════════════ */
 function doLogin() {
-  var u = (document.getElementById('liU') && document.getElementById('liU').value || '').trim();
-  var p = (document.getElementById('liP') && document.getElementById('liP').value || '').trim();
+  var u = document.getElementById('liU').value.trim();
+  var p = document.getElementById('liP').value.trim();
   var err = document.getElementById('liErr');
-  if(err) err.textContent = '';
+  var btn = document.getElementById('liBtn');
+  if(!u || !p) { err.textContent='يرجى إدخال اسم المستخدم وكلمة المرور'; return; }
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = '⏳ جارٍ التحقق…';
 
-  if(!u || !p) {
-    if(err) err.textContent = 'أدخل اسم المستخدم وكلمة المرور';
+  if(DEV) {
+    setTimeout(function() {
+      sess = { username:u, displayName:u, role:'admin', loginTime:Date.now(), isAll:true, stations:[] };
+      localStorage.setItem('c3aSess', JSON.stringify(sess));
+      afterLogin(); loadData();
+    }, 600);
     return;
   }
 
-  // الاتصال المباشر بقاعدة البيانات 
-  var sbc = _initSB();
-  
-  // تنظيف اسم المستخدم وتحويله لحروف صغيرة للتطابق
-  var finalUser = u.toLowerCase().replace(/\s+/g,'');
-
-  sbc.from('app_users')
-    .select('*')
-    .eq('username', finalUser)
-    .then(function(res) {
-      if(res.error) {
-        if(err) err.textContent = 'خطأ في الاتصال: ' + res.error.message;
-        return;
-      }
-      
-      var user = res.data && res.data[0];
-      
-      // مقارنة مباشرة بالنص الصريح (دون تشفير)
-      if(!user || user.password !== p) {
-        if(err) err.textContent = 'المستخدم غير موجود أو كلمة المرور خاطئة';
-        return;
-      }
-
-      // بناء جلسة تسجيل الدخول الناجحة
-      var allowed = [];
-      try {
-        allowed = typeof user.stations === 'string' ? JSON.parse(user.stations || '[]') : (user.stations || []);
-      } catch(e){}
-      
-      sess = {
-        username: user.username,
-        display_name: user.display_name || user.username,
-        role: user.role || 'operator',
-        stations: allowed,
-        loginTime: Date.now(),
-        _isAll: !allowed || allowed.length === 0,
-        _allowed: allowed
-      };
-      
-      localStorage.setItem('c3aSess', JSON.stringify(sess));
-      afterLogin();
-      loadData();
+  db.login(u, p)
+    .then(function(r) {
+      btn.disabled = false; btn.textContent = 'دخول ← تسجيل';
+      if(r.success) {
+        sess = Object.assign({}, r, {loginTime: r.loginTime || Date.now()});
+        localStorage.setItem('c3aSess', JSON.stringify(sess));
+        if(!DEV) db.log(sess.username||'?', 'LOGIN', 'role='+sess.role);
+        afterLogin(); loadData();
+      } else { err.textContent = r.error || 'خطأ في تسجيل الدخول'; }
     })
     .catch(function(e) {
-      if(err) err.textContent = 'فشل النظام: ' + e.message;
+      btn.disabled = false; btn.textContent = 'دخول ← تسجيل';
+      err.textContent = 'فشل الاتصال: ' + e.message;
     });
 }
-  function afterLogin() {
+
+function afterLogin() {
   document.getElementById('s-login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('navUname').textContent = sess.displayName || sess.username || '—';
