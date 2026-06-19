@@ -1185,14 +1185,11 @@ function doLogin() {
     return;
   }
 
-  // إجبار الكود على الاتصال الحقيقي بقاعدة البيانات ومسح الفحص التلقائي لـ DEV
+  // الاتصال المباشر بقاعدة البيانات 
   var sbc = _initSB();
   
-  // معالجة اسم المستخدم (حروف صغيرة ومسح المسافات)
+  // تنظيف اسم المستخدم وتحويله لحروف صغيرة للتطابق
   var finalUser = u.toLowerCase().replace(/\s+/g,'');
-
-  // تحويل الباسورد لـ SHA256 كما ينتظره السيرفر
-  var hashedPass = sha256(p); 
 
   sbc.from('app_users')
     .select('*')
@@ -1205,7 +1202,8 @@ function doLogin() {
       
       var user = res.data && res.data[0];
       
-      if(!user || user.password !== hashedPass) {
+      // مقارنة مباشرة بالنص الصريح (دون تشفير)
+      if(!user || user.password !== p) {
         if(err) err.textContent = 'المستخدم غير موجود أو كلمة المرور خاطئة';
         return;
       }
@@ -1233,7 +1231,8 @@ function doLogin() {
     .catch(function(e) {
       if(err) err.textContent = 'فشل النظام: ' + e.message;
     });
-}function afterLogin() {
+}
+  function afterLogin() {
   document.getElementById('s-login').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('navUname').textContent = sess.displayName || sess.username || '—';
