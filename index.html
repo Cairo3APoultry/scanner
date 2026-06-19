@@ -865,8 +865,7 @@ function _initSB() {
   try { sb = window.supabase.createClient(SB_URL, SB_KEY); } catch(e) {}
   return sb;
 }
-var DEV = (!SB_URL || SB_URL.indexOf('http') !== 0);
-
+var DEV = false;
 /* ════ DEFAULT STATIONS ════ */
 var ST_DEFAULT = [
   {key:'wash',  label:'مغسلة',      icon:'🚿', bench:15, en:'Wash',    order:1},
